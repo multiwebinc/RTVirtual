@@ -1,0 +1,2279 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <!--
+    The MIT License (MIT)
+    Copyright (c) 2016 Multiwebinc
+    https://github.com/multiwebinc
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of
+    this software and associated documentation files (the "Software"), to deal in
+    the Software without restriction, including without limitation the rights to
+    use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+    the Software, and to permit persons to whom the Software is furnished to do so,
+    subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+    FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+    COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+    /*
+     * TXT file format:
+     * ################
+     *
+     * Line 1, Col 1-7 - Número de póliza
+     * Line 1, Col 8 - Tipo de planilla
+     *     M = mensual
+     *     A = adicional
+     *     N = inactiva
+     *     E = especial
+     * Line 1, Col 9-12 Año
+     * Line 1, Col 13-14 Mes
+     * Line 1, Col 15 - nbsp
+     * Line 1, Col 16-35 - ID de patrono (right padded with nbsp)
+     *     Cédula nacional prepend with 0
+     *     Cédula de residencia prepend with 1
+     *     Cédula jurídica empieza con 2,3,4
+     *     Documento único prepend with 6
+     *     Pasaporte prepend with 9
+     * Line 1, Col 36-43 - Teléfono
+     * Line 1, Col 44-51 - Fax
+     * Line 1, Col 53-56 - Build version (e.g. V08D)
+     * Line 1, Col 57-80 - Random ? string. Seems to have no effect. Works if omitted.
+     *
+     * Line 2, Col 1-6 - Literal "Email"
+     * Line 2, Col 7-56 - Email (right padded with nbsp)
+     *
+     * Line 3, Col 1-9 Literal "Domicilio" o "Apartado "
+     * Line 3. Col 10-180 - Dirección o apartado (right padded with nbsp)
+     *
+     * Lines 4+ Employee list
+     * Col 1: Tipo de ID
+     *     0 - CN - Cédula nacional
+     *     1 - CR - Cédula de residencia
+     *     6 - DU - Documento único
+     *     9 - NP - Pasaporte
+     *     8 - PT - Permiso de trabajo
+     *     5 - SD - Sin documentos
+     * Col 2-20 - ID number (right padded with nbsp)
+     *     Para SD:
+     *         Col 2-3 - Nacionalidad,
+     *         Col 4-11 - fecha nacimiento (DDMMYYYY),
+     *         Col 12 - Primer letra de primer apellido
+     *         Col 13 - Primer letra de segundo apellido. Si no tiene hay que
+     *             dejar un espacio en blanco.
+     *         Col 14 - Primer letra de nombre
+     * Col 21-40 - Número de asegurado
+     * Col 41-55 - Nombre
+     * Col 56-70 - Primer apellido
+     * Col 71-85 - Segundo apellido
+     * Col 86-98 - Salario (zero padded with 2 d.p.)
+     * Col 99 - 101 - Días (zero padded)
+     * 102-105 - Horas (zero padded)
+     *     Tiempo completo, Ocasional por días: horas = dias * 8
+     *     Medio tiempo: horas = dias * 4
+     *     Ocasional por horas: dias = round((horas / 8) + 0.5)
+     * 106-107 - Jornada
+     *     01 - Tiempo completo
+     *     02 - Medio tiempo
+     *     03 - Ocasional por días
+     *     04 - Ocasional por horas
+     * 108-109 - Observación
+     *     00 - (none)
+     *     01 = "Entró en el mes"
+     *     02 = "Salió en el mes"
+     *     03 = "Incapacitado por CCSS"
+     *     04 = "Incapacitado por INS"
+     *     05 = "Entró y salió en el mes"
+     *     06 = "Licencia sin salario"
+     *     07 = "Licencia por maternidad"
+     *     08 = "Ajuste meses anteriores"
+     * 110 - Siempre 0
+     * Col 111-114 - Ocupación
+     *
+     * Notes:
+     * ######
+     * Line terminations: \r\n
+     * Add trailing line break
+     */
+    -->
+    <title>Aplicación para crear planillas (PlaniRTHTML_v1a)</title>
+
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+      * {
+        margin: 0; padding: 0;
+      }
+
+      body {
+        font-family: montserrat, arial, verdana;
+        background-color: transparent;
+      }
+
+      .glyphicon {
+        cursor: pointer;
+      }
+</style>
+</head>
+<body>
+<div class="container-fluid">
+  <noscript>
+    <div class="alert alert-warning">Warning: Javascript is required</div>
+  </noscript>
+
+  <div id="start">
+    <div class="alert alert-notice">
+      <p>
+        <b>Bienvenido</b> - Esta aplicación le permitirá crear su Declaración de
+        Planilla de Riesgos del Trabajo y convertirla en un archivo TXT para enviarla
+        por medio del sistema RT-virtual del INS.
+      </p>
+      <p>
+        Recordamos que el periodo para presentar su Declaración de Planilla inicia
+        el día 1 y finaliza el día 8 de cada mes. A la vez, le informamos que el plazo
+        para anular o modificar su Declaración de Planilla es de 24 horas naturales
+        contadas desde el momento de presentación de la declaración.
+      </p>
+      <p>
+        Si requiere asesoría, por favor contacte a su Agente de Seguros o
+        comuniquese a nuestro Centro de Atención al Cliente al número gratuito
+        800-TELEINS (800-8353-467).
+      </p>
+    </div>
+
+    <button type="button" class="btn btn-primary" id="import">
+      <i class="glyphicon glyphicon-import"></i> Importar TXT
+    </button>
+  </div>
+
+  <div id="datos-patrono">
+    <h2>Datos del patrono</h2>
+    <div class="form-horizontal">
+      <div class="form-group">
+        <label for="poliza" class="col-sm-3 control-label">Póliza Nº</label>
+        <div class="col-sm-9">
+          <input type="number" class="form-control" id="poliza" placeholder="Número de póliza">
+          <p class="help-block">
+            Digite su número de póliza de Riezgos de Trabajo. Esta consta de 7
+            dígitos y se puede visualizar en su recibo de pago.
+          </p>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="tipo-cedula" class="col-sm-3 control-label">Identificación del patrono</label>
+        <div class="col-sm-9">
+          <select id="tipo-cedula" class="form-control">
+            <option>(Seleccione una opción)</option>
+            <option value="CJ">Cédula jurídica</option>
+            <option value="CN">Cédula nacional</option>
+            <option value="R">Residencia</option>
+            <option value="DU">Documento único</option>
+            <option value="P">Pasaporte</option>
+          </select>
+          <input type="text" class="form-control" id="num-cedula" placeholder="Número de identificación">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="tel" class="col-sm-3 control-label">Nº teléfono</label>
+        <div class="col-sm-9">
+            <input type="tel" class="form-control" id="tel" placeholder="Número de teléfono" pattern="^(\d-? ?){8}$">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="fax" class="col-sm-3 control-label">Nº fax</label>
+        <div class="col-sm-9">
+          <input type="tel" class="form-control" id="fax" placeholder="Número de fax" pattern="^(\d-? ?){8}$">
+          <p class="help-block">
+            Ingrese un número de facsímil electrónico para recibir notificaciones.
+          </p>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="email" class="col-sm-3 control-label">Correo (email)</label>
+        <div class="col-sm-9">
+          <input type="email" class="form-control" id="email" placeholder="Email">
+          <p class="help-block">
+            Ingrese un correo electrónico para recibir notificaciones.
+          </p>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="address-type" class="col-sm-3 control-label">Domicilio</label>
+        <div class="col-sm-9">
+          <select id="address-type" class="form-control">
+            <option>(Seleccione una opción)</option>
+            <option value="DF">Dirección física</option>
+            <option value="AP">Apartado postal</option>
+          </select>
+          <p class="help-block">
+            Tipo de domicilio para notificaciones
+          </p>
+          <input type="text" class="form-control" id="address-text" placeholder="Dirección">
+          <p class="help-block">
+            Ingrese un apartado postal o una dirección física para recibir
+            notificaciones. Recuerde indicar provincia, el cantón y el distrito,
+            así como otras señas que faciliten la localización.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="datos-planilla">
+    <h2>Datos de planilla</h2>
+    <div class="form-horizontal">
+      <div class="form-group">
+        <label for="month" class="col-sm-3 control-label">Mes</label>
+        <div class="col-sm-9">
+          <select class="form-control" id="month">
+            <option value="">(seleccione)</option>
+            <option value="1">Enero</option>
+            <option value="2">Febrero</option>
+            <option value="3">Marzo</option>
+            <option value="4">Abril</option>
+            <option value="5">Mayo</option>
+            <option value="6">Junio</option>
+            <option value="7">Julio</option>
+            <option value="8">Agosto</option>
+            <option value="9">Septiembre</option>
+            <option value="10">Octubre</option>
+            <option value="11">Noviembre</option>
+            <option value="12">Diciembre</option>
+            <option value="13">Aguinaldo</option>
+            <option value="14">Salario escolar</option>
+          </select>
+          <input type="number" class="form-control" id="year" placeholder="Año">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="tipo-planilla" class="col-sm-3 control-label">Tipo de planilla</label>
+        <div class="col-sm-9">
+          <select class="form-control" id="tipo-planilla">
+            <option value="">(seleccione)</option>
+            <option value="M">Mensual</option>
+            <option value="A">Adicional</option>
+            <option value="N">Inactiva</option>
+            <option value="E">Especial</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="empleados">
+    <h2>Trabajadores</h2>
+    <button type="button" class="btn btn-success" id="add-employee-button">
+      <i class="glyphicon glyphicon-plus-sign"></i>
+      Agregar trabajador
+    </button>
+    <table id="empleados-table" class="table table-striped">
+      <thead>
+        <tr>
+          <td>Tipo de identificación</td>
+          <td>Nacionalidad</td>
+          <td>identificación</td>
+          <td>Nº asegurado</td>
+          <td>Nombre</td>
+          <td>Primer apellido</td>
+          <td>Segundo apellido</td>
+          <td>Jornada</td>
+          <td>Días pagados</td>
+          <td>Horas pagadas</td>
+          <td>Salario</td>
+          <td>Observación</td>
+          <td>Ocupación</td>
+          <td>Acciones</td>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="14">
+            <div class="alert alert-warning">
+              Planilla no contiene trabajadores
+            </div>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <h3>Totales</h3>
+    <table id="totals-table" class="table">
+      <tr>
+        <td>Trabadores</td>
+        <td><span id="total-trabajadores" class="badge">0</span></td>
+        <td>Total de salarios</td>
+        <td><span class="badge">₡ <span id="total-salarios">0</span></span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div id="generate">
+    <button type="button" class="btn btn-primary" id="generate-txt-button">
+      <i class="glyphicon glyphicon-save-file"></i>
+      Generar archivo TXT
+    </button>
+  </div>
+
+  <div class="modal fade" id="employee-modal" tabindex="-1" role="dialog" aria-labelledby="employee-modal" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+          <h2 class="modal-title">Datos del trabajador</h2>
+        </div>
+        <div class="modal-body">
+          <div class="form-horizontal">
+            <div class="form-group">
+              <label for="id-type" class="col-sm-4 control-label">
+                Tipo de identificación:
+              </label>
+              <div class="col-sm-8">
+                <select id="id-type" class="form-control">
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="nacionalidad" class="col-sm-4 control-label">
+                Nacionalidad:
+              </label>
+              <div class="col-sm-8">
+                <select id="nacionalidad" class="form-control">
+                </select>
+                <p class="help-block">
+                  Este campo es obligatorio para <b>indocumentados</b>.
+                </p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="id-num" class="col-sm-4 control-label">
+                Identificación:
+              </label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="id-num">
+                <p class="help-block">
+                  En el caso de indocumentados, deberá digitar la <b>fecha de
+                  nacimiento</b> de la siguiente forma <code>DíaMesAño</code>
+                  (ejemplo: 02012004 para el 2 de febrero del 2004).
+                </p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="num-asegurado" class="col-sm-4 control-label">
+                Nº asegurado:
+              </label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="num-asegurado">
+                <p class="help-block">
+                  Este número lo asigna la Caja Costarricense de Seguro Social y
+                  se encuentra en el Carnet del Asegurado y en la planilla de la
+                  CCSS.
+                </p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="nombre" class="col-sm-4 control-label">
+                Nombre:
+              </label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="nombre">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="apellido1" class="col-sm-4 control-label">
+                Primer apellido:
+              </label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="apellido1">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="apellido2" class="col-sm-4 control-label">
+                Segundo apellido:
+              </label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="apellido2">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="jornada" class="col-sm-4 control-label">
+                Jornada laboral:
+              </label>
+              <div class="col-sm-8">
+                <select id="jornada" class="form-control">
+                  <option value="">(seleccione)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="dias" class="col-sm-4 control-label">
+                Días pagados:
+              </label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="dias">
+                <p class="help-block">
+                  Digite la cantidad de días pagados en el mes. Considere los días
+                  de descanso y los días feriados pagados por ley.
+                </p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="horas" class="col-sm-4 control-label">
+                Horas:
+              </label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="horas">
+                <p class="help-block">
+                  Digite la cantidad de horas pagadas en el mes. Este dato solo es
+                  necesario si la Jornada seleccionada es <code>Ocasional
+                  contratado por horas</code>.
+                </p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="salario" class="col-sm-4 control-label">
+                Salario:
+              </label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="salario">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="observacion" class="col-sm-4 control-label">
+                Observación:
+              </label>
+              <div class="col-sm-8">
+                <select id="observacion" class="form-control">
+                </select>
+                <p class="help-block">
+                  Si ninguna aplica, deje el campo en blanco.
+                </p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="ocupacion" class="col-sm-4 control-label">
+                Ocupación:
+              </label>
+              <div class="col-sm-8">
+                <select id="ocupacion" class="form-control">
+                  <option value="">(seleccione)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">
+              Cancelar
+            </button>
+            <button id="save" type="button" class="btn btn-primary">
+              Guardar datos del trabajador
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="import-modal" tabindex="-1" role="dialog" aria-labelledby="import-modal" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+          <h2 class="modal-title">Importar datos de un archivo TXT</h2>
+        </div>
+        <div class="modal-body">
+          <div class="form-horizontal">
+            <div class="form-group">
+              <label for="id-type" class="col-sm-4 control-label">
+                Archivo:
+              </label>
+              <div class="col-sm-8">
+                <div class="checkbox">
+                  <input type='file' accept='text/plain' id="fileinput">
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="import-success-modal" tabindex="-1" role="dialog" aria-labelledby="import-success-modal" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-body">
+          <div class="alert alert-success">
+            <i class="glyphicon glyphicon-ok-sign"></i>
+            La planilla de <span id="import-month"></span> de
+            <span id="import-year"></span> para la póliza
+            <span id="import-poliza"></span> se importó con un total de
+            <span id="import-trabajadores"></span> trabajadores.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-dismiss="modal">
+            Continuar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="export-success-modal" tabindex="-1" role="dialog" aria-labelledby="export-success-modal" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-body">
+          <div class="alert alert-success">
+            <p>
+              <i class="glyphicon glyphicon-ok-sign"></i>
+              Se creó el archivo con la
+              planilla de <span id="export-month"></span> de
+              <span id="export-year"></span> para la póliza
+              <span id="export-poliza"></span> con un total de
+              <span id="export-trabajadores"></span> trabajadores.
+            </p>
+            <p>
+              Puede copiar este archivo en un medio electrónico y
+              entregarlo en cualquiera de las Sedes del INS; o enviarlo
+              a través del sistema RT-Virtual en el sitio web
+              <a href="http://rtvirtual.ins-cr.com/">http://rtvirtual.ins-cr.com/</a>.
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">
+            Cerrar
+          </button>
+          <a href="http://rtvirtual.ins-cr.com/modPlanilla/frmRegistroPlanillaPart1.aspx" class="btn btn-primary">
+            <i class="glyphicon glyphicon-log-in"></i>
+            Ingrese al Sistema RT-Virtual
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+"use strict";
+
+function Trabajador(
+  id_type,
+  id_num,
+  nacionalidad,
+  num_asegurado,
+  nombre,
+  apellido1,
+  apellido2,
+  jornada,
+  dias,
+  horas,
+  salario,
+  observacion,
+  ocupacion
+) {
+  var errors = {};
+
+  this.setValuesFromString = function(string) {
+    if (string.length !== 115) {
+      console.error("La linea no tiene 115 carácteres.");
+      return false;
+    }
+    id_type = string.substring(0, 1).trim();
+    num_asegurado = string.substring(20,40).trim();
+    nombre = string.substring(40,55).trim();
+    apellido1 = string.substring(55,70).trim();
+    apellido2 = string.substring(70,85).trim();
+    jornada = string.substring(105,107).trim();
+    dias = string.substring(98,101).trim().replace(/^[0]+/g,"");
+    horas = string.substring(101,105).trim().replace(/^[0]+/g,"");
+    salario = string.substring(85,98).trim().replace(/^[0]+/g,"");
+    observacion = string.substring(107,109).trim();
+    ocupacion = string.substring(110,114).trim();
+
+    if (apellido2 == "...") {
+      apellido2 = "";
+    }
+
+    if (id_type == "5") {
+      nacionalidad = string.substring(1,3);
+      id_num = string.substring(3,11);
+    }
+    else {
+      nacionalidad = "";
+      id_num = string.substring(1,20);
+    }
+  };
+
+  var validate = function() {
+    errors = {};
+    if (
+      id_type === undefined
+      || num_asegurado === undefined
+      || nombre === undefined
+      || apellido1 === undefined
+      || jornada === undefined
+      || salario === undefined
+      || ocupacion === undefined
+    ) {
+      errors.general = "Invalid";
+      return false;
+    }
+
+    // Tipo de identificación
+    if (id_type.length === 0 || id_type == "-1") {
+      errors.id_type = 'Es necesario seleccionar el tipo de identificación';
+    }
+    else if (!id_types.hasOwnProperty("_"+id_type)) {
+      errors.id_type = 'Tipo de identificación inválido';
+    }
+
+    // Nacionalidad
+    if (id_type == "5" && (nacionalidad.length === 0 || nacionalidad == "-1")) {
+      errors.nacionalidad = 'Es necesario seleccionar la nacionalidad para indocumentados';
+    }
+    else if (nacionalidad.length > 0 && !nacionalidades.hasOwnProperty(nacionalidad)) {
+      errors.nacionalidad = 'Nacionalidad inválida';
+    }
+    else {
+      nacionalidad = "-1";
+    }
+
+    // Identificación
+    if (id_type != "9") {
+      id_num = id_num.replace(/\D/g,'');
+    }
+    switch (id_type) {
+      case "0":
+        if (id_num.length !== 9) {
+          errors.id_num = 'Identificación incorrecta (debe ingresar 9 dígitos exactos)';
+        }
+        break;
+      case "1":
+        if (id_num.length !== 17) {
+          errors.id_num = 'Identificación incorrecta (debe ingresar 17 dígitos exactos). Para documentos con menos de 17 dígitos ponga zeros al final del número para completar los 17 dígitos.';
+        }
+        break;
+      case "8":
+        if (id_num.length < 5 || id_num.length > 14) {
+          errors.id_num = 'Identificación incorrecta (debe tener entre 5 y 14 carácteres)';
+        }
+        else {
+          var id_year = id_num.substring(0, 4);
+          var cur_year = new Date().getFullYear();
+
+          if (id_year < cur_year - 4 || id_year > cur_year) {
+            errors.id_num = "Permiso de trabajo vencido (verifique la vigencia en el documento)";
+          }
+        }
+        break;
+      case "6":
+        if (id_num.length !== 12) {
+          errors.id_num = 'Identificación incorrecta (debe ingresar 12 dígitos exactos)';
+        }
+        break;
+      case "9":
+        if (id_num.length < 4) {
+          errors.id_num = 'Identificación incorrecta (debe tener al menos 4 carácteres)';
+        }
+        break;
+      case "5":
+        var date_regex = /^(0[1-9]|1\d|2\d|3[01])(0[1-9]|1[0-2])(19|20)\d{2}$/ ;
+        if (!(date_regex.test(id_num))) {
+          errors.id_num = 'Identificación incorrecta (debe ingresar la fecha de nacimiento en formato "ddmmaaaa")';
+        }
+        break;
+    }
+
+    // Número de asegurado
+    if (id_type == "0" && num_asegurado.length === 0) {
+      num_asegurado = id_num;
+    }
+    else if (num_asegurado.length < 4) {
+      errors.num_asegurado = 'Número de asegurado incorrecto';
+    }
+
+    // Nombre
+    if (nombre.length === 0) {
+      errors.nombre = 'Nombre del trabajador incompleto';
+    }
+
+    // Apellido
+    if (apellido1.length === 0) {
+      errors.apellido1 = 'Apellido del trabajador incompleto';
+    }
+
+    // Jornada
+    if (jornada.length === 0 || !jornadas.hasOwnProperty(jornada)) {
+      errors.jornada = 'Debe seleccionar la jornada laboral';
+    }
+    else {
+      // Horas
+      if (jornada == "04") {
+        dias = "";
+        if (!isNormalInteger(horas) || horas < 1 || horas > 102) {
+          errors.horas = 'Cantidad de horas debe ser un número entre 1 y 102';
+        }
+      }
+      else {
+        horas = "";
+        if (!isNormalInteger(dias) || dias < 1 || dias > 31) {
+          errors.dias = 'Cantidad de días debe ser un número entre 1 y 31';
+        }
+      }
+    }
+
+    // Salario
+    // Cast to float
+    salario = parseFloat(salario);
+    if (salario.length === 0 || isNaN(salario) || salario <= 0) {
+      errors.salario = 'Monto de Salario incorrecto (debe ser un número mayor a 0)';
+    }
+
+    // Observacion
+    if (!observaciones.hasOwnProperty(observacion)) {
+      errors.observacion = 'Observación inválida';
+    }
+
+    // Ocupación
+    if (ocupacion.length > 0) {
+      ocupacion = ocupacion.replace(/\D/g,'');
+    }
+    if (ocupacion.length === 0 || !ocupaciones.hasOwnProperty("_"+ocupacion)) {
+      errors.ocupacion = 'Debe seleccionar la ocupación del trabajador';
+    }
+
+    if ($("#empleados-table tbody tr:not([data-editing-row='true']) td[data-col='id_num'][data-val='"+id_num+"']").length > 0) {
+      errors.id_num = 'Un trabajador con el mismo número de identificación ya existe';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return false;
+    }
+    return true;
+  };
+
+  this.hasErrors = function() {
+    return !validate.call(this);
+  };
+
+  this.getErrors = function() {
+    validate.call(this);
+    return errors;
+  };
+
+  var getHtml = function() {
+    if (this.hasErrors() === true) {
+      console.error("No se puede generar el HTML si hay errores");
+      return false;
+    }
+    var nacionalidad_val = (nacionalidad == "-1") ? "" : nacionalidades[nacionalidad];
+    var observacion_val = (observacion == "00") ? "" : observacion;
+
+    var html = '';
+    html += '<td data-col="id_type" data-val="' + id_type + '">' + id_types["_"+id_type] + '</td>';
+    html += '<td data-col="nacionalidad" data-val="' + nacionalidad + '">' + nacionalidad_val + '</td>';
+    html += '<td data-col="id_num" data-val="' + id_num + '">' + id_num + '</td>';
+    html += '<td data-col="num_asegurado" data-val="' + num_asegurado + '">' + num_asegurado + '</td>';
+    html += '<td data-col="nombre" data-val="' + nombre + '">' + nombre + '</td>';
+    html += '<td data-col="apellido1" data-val="' + apellido1 + '">' + apellido1 + '</td>';
+    html += '<td data-col="apellido2" data-val="' + apellido2 + '">' + ((apellido2 == "") ? "..." : apellido2) + '</td>';
+    html += '<td data-col="jornada" data-val="' + jornada + '">' + jornadas[jornada] + '</td>';
+    html += '<td data-col="dias" data-val="' + dias + '">' + dias + '</td>';
+    html += '<td data-col="horas" data-val="' + horas + '">' + horas + '</td>';
+    html += '<td data-col="salario" data-val="' + salario + '">₡' + salario.toLocaleString() + '</td>';
+    html += '<td data-col="observacion" data-val="' + observacion + '">' + observacion_val + '</td>';
+    html += '<td data-col="ocupacion" data-val="' + ocupacion + '">' + ocupaciones["_"+ocupacion] + '</td>';
+    html += '<td class="action-buttons"></td>';
+
+    return html;
+  };
+
+  this.addEmployee = function() {
+    var html = getHtml.call(this);
+    $('<tr>' + html + '</tr>').appendTo($("#empleados-table"));
+    var row = $("#empleados-table tbody tr").last();
+
+    afterAddOrEdit(row);
+  };
+
+  this.editEmployee = function(id) {
+    var row = $("#empleados-table tbody tr[data-editing-row='true']");
+    var html = getHtml.call(this);
+    row.html(html);
+
+    // Set data-editing-row of all trs to "false"
+    $('#empleados-table tbody').find('tr').each(function() {
+      $(this).removeAttr('data-editing-row');
+    });
+
+    afterAddOrEdit(row);
+  };
+}
+
+$(document).on("change", "#fileinput", function(event) {
+  // Check for the various File API support.
+  if (!window.FileReader) {
+    alert('The FileReader API is not supported by your browser.');
+  }
+  var f = event.target.files[0];
+
+  if (f) {
+    var r = new FileReader();
+    r.onload = function(e) {
+      importText(e.target.result);
+    };
+    r.readAsText(f, 'ISO-8859-1');
+  } else {
+    alert("Failed to load file");
+  }
+  document.getElementById('fileinput').value = "";
+});
+
+function importText(txt) {
+  var build_version = txt.substring(52,55);
+
+  if (build_version != "V08") {
+    alert("La versión del archivo no es compatible con este programa");
+    return false;
+  }
+
+  // Get first line
+  var line1 = txt.substring(0, txt.indexOf("\n"));
+  // Remove first line
+  txt = txt.substring(txt.indexOf("\n") + 1);
+
+  // Get second line
+  var line2 = txt.substring(0, txt.indexOf("\n"));
+  // Remove second line
+  txt = txt.substring(txt.indexOf("\n") + 1);
+
+  // Get third line
+  var line3 = txt.substring(0, txt.indexOf("\n"));
+  // Remove third line
+  txt = txt.substring(txt.indexOf("\n") + 1);
+
+  var poliza = line1.substring(0, 7);
+  var tipo_planilla = line1.substring(7,8);
+  var year = line1.substring(8,12);
+  var month = line1.substring(12,14);
+  var num_cedula = line1.substring(15,35).trim();
+  var tel = line1.substring(35,43);
+  var fax = line1.substring(43,51).trim();
+
+  var email = line2.substring(6, 56).trim();
+
+  var address_type = line3.substring(0,9).trim();
+  var address_text = line3.substring(9, 180).trim();
+
+  // Set values (lines 4+)
+
+  $("#poliza").val(poliza);
+  $("#tipo-planilla").val(tipo_planilla);
+  $("#year").val(year);
+
+  if (month.charAt(0) == "0") {
+    month = month.charAt(1);
+  }
+  $("#month").val(month);
+
+  var tipo_cedula;
+  switch (num_cedula.charAt(0)) {
+    case "0":
+      tipo_cedula = "CN";
+      num_cedula = num_cedula.substring(1);
+      break;
+    case "1":
+      tipo_cedula = "R";
+      num_cedula = num_cedula.substring(1);
+      break;
+    case "2":
+    case "3":
+    case "4":
+      tipo_cedula = "CJ";
+      break;
+    case "6":
+      tipo_cedula = "DU";
+      num_cedula = num_cedula.substring(1);
+      break;
+    case "9":
+      tipo_cedula = "P";
+      num_cedula = num_cedula.substring(1);
+      break;
+    default:
+      alert("Hay un error con el archivo. No se pudo importar.");
+      return false;
+  }
+  $("#tipo-cedula").val(tipo_cedula);
+  $("#num-cedula").val(num_cedula);
+
+  $("#tel").val(tel);
+  $("#fax").val(fax);
+  $("#email").val(email);
+
+  switch (address_type) {
+    case "Domicilio":
+      $("#address-type").val("DF");
+      break;
+    case "Apartado":
+      $("#address-type").val("AP");
+      break;
+    default:
+      alert("Hay un error con el archivo. No se pudo importar.");
+      return false;
+  }
+
+  $("#address-text").val(address_text);
+
+
+
+  // Loop through remaining lines in the text file
+  var trabajadores = txt.split('\n');
+  $("#empleados-table tbody").html("");
+
+  var imported_all = true;
+  trabajadores.forEach(function(line, index) {
+    if (line.length === 0) {
+      // Remove it from the array
+      trabajadores.splice(trabajadores.indexOf(index), 1);
+      return false;
+    }
+    var trabajador = new Trabajador();
+    trabajador.setValuesFromString(line);
+
+    if (trabajador.hasErrors() === false) {
+      trabajador.addEmployee();
+    }
+    else {
+      imported_all = false;
+      console.error(trabajador.getErrors());
+    }
+  });
+
+  if (imported_all === true) {
+    $("#import-month").text(month);
+    $("#import-year").text(year);
+    $("#import-poliza").text(poliza);
+    $("#import-trabajadores").text(trabajadores.length);
+
+    $('#import-success-modal').modal();
+  }
+  else {
+    alert("Habían problemas con el archivo. Algunos trabajadores no pudieron ser importados.");
+    $('#import-modal').modal("hide");
+  }
+}
+
+$('#import-success-modal').on('hide.bs.modal', function (e) {
+  $('#import-modal').modal("hide");
+});
+$('#employee-modal').on('hide.bs.modal', function (e) {
+  clearForm();
+});
+
+// Limit ocupation lengths to maxChar characters
+$('#employee-modal').on('show.bs.modal', function (e) {
+  var optionText, array = [], newString, maxChar = 40;
+  $('#ocupacion').find('option').each(function(i,e) {
+      $(e).attr('title',$(e).text());
+      optionText = $(e).text();
+      newString = '';
+      if (optionText.length > maxChar) {
+          array = optionText.split(' ');
+          $.each(array,function(ind,ele) {
+              newString += ele+' ';
+              if (ind > 0 && newString.length > maxChar) {
+                  $(e).text(newString);
+                  return false;
+              }
+          });
+
+      }
+  });
+});
+
+$("#start").fadeIn(1000);
+
+$("#import").click(function() {
+  var confirm = true;
+  if ($("#empleados-table tbody tr").length > 0) {
+    confirm = window.confirm("Los empleados que ya están serán borrados. ¿Continue?");
+  }
+  if (confirm) {
+    $('#import-modal').modal();
+  }
+});
+
+$("#add-employee-button").click(function() {
+  $('#employee-modal').attr('data-is-edit', 'false').modal();
+});
+$("#save").click(function() {
+  var id_type = $("#id-type").val();
+  var nacionalidad = $("#nacionalidad").val();
+  var id_num = $("#id-num").val();
+  var num_asegurado = $("#num-asegurado").val().replace(/\D/g,'');
+  var nombre = $("#nombre").val();
+  var apellido1 = $("#apellido1").val();
+  var apellido2 = $("#apellido2").val();
+  var jornada = $("#jornada").val();
+  var dias = $("#dias").val();
+  var horas = $("#horas").val();
+  var salario = $("#salario").val().replace(/\D/g,'');
+  var observacion = $("#observacion").val();
+  var ocupacion = $("#ocupacion").val();
+
+  var trabajador = new Trabajador(
+    id_type,
+    id_num,
+    nacionalidad,
+    num_asegurado,
+    nombre,
+    apellido1,
+    apellido2,
+    jornada,
+    dias,
+    horas,
+    salario,
+    observacion,
+    ocupacion
+  );
+
+  if (trabajador.hasErrors() === false) {
+    if ($('#employee-modal').attr('data-is-edit') == 'true') {
+      trabajador.editEmployee();
+    }
+    else {
+      trabajador.addEmployee();
+    }
+  }
+  else {
+    var errorstr = "Errores encontrados:\n\n";
+    $.each(trabajador.getErrors(), function(key, value) {
+      errorstr += "* " + value + "\n";
+    });
+    alert(errorstr);
+  }
+});
+
+function afterAddOrEdit(row) {
+  addActionButtons();
+  $("#empleados-table tfoot").hide();
+  updateTotals();
+
+  $('#employee-modal').modal('hide');
+  $('#empleados-table tbody').find('tr').each(function() {
+    $(this).removeAttr('data-editing-row');
+  });
+  row.highlight();
+}
+
+$(document).on("click", ".edit", function(event) {
+  var tr = $(this).closest("tr");
+  tr.attr('data-editing-row', 'true');
+
+  $("#id-type").val(tr.find("td[data-col='id_type']").attr("data-val"));
+  $("#nacionalidad").val(tr.find("td[data-col='nacionalidad']").attr("data-val"));
+  $("#id-num").val(tr.find("td[data-col='id_num']").attr("data-val"));
+  $("#num-asegurado").val(tr.find("td[data-col='num_asegurado']").attr("data-val"));
+  $("#nombre").val(tr.find("td[data-col='nombre']").attr("data-val"));
+  $("#apellido1").val(tr.find("td[data-col='apellido1']").attr("data-val"));
+  $("#apellido2").val(tr.find("td[data-col='apellido2']").attr("data-val"));
+  $("#jornada").val(tr.find("td[data-col='jornada']").attr("data-val"));
+  $("#dias").val(tr.find("td[data-col='dias']").attr("data-val"));
+  $("#horas").val(tr.find("td[data-col='horas']").attr("data-val"));
+  $("#salario").val(tr.find("td[data-col='salario']").attr("data-val"));
+  $("#observacion").val(tr.find("td[data-col='observacion']").attr("data-val"));
+  $("#ocupacion").val(tr.find("td[data-col='ocupacion']").attr("data-val"));
+  $('#employee-modal').attr('data-is-edit', 'true').modal();
+});
+
+$(document).on("click", ".delete", function(event) {
+  if (window.confirm("¿Borrar este trabajador?")) {
+    $(this).closest("tr").remove();
+    if ($("#empleados-table tbody tr").length === 0) {
+      $("#empleados-table tfoot").show();
+    }
+    updateTotals();
+  }
+});
+
+function updateTotals() {
+  // Total de trabajadores
+  $("#total-trabajadores").text($("#empleados-table tbody tr").length);
+
+  // Total de salarios
+  var total = 0;
+  $("#empleados-table tbody tr td[data-col='salario']").each(function() {
+    total += parseInt($(this).attr("data-val"), 10);
+  });
+  $("#total-salarios").text(total.toLocaleString());
+}
+
+function addActionButtons() {
+  var html = '<span class="glyphicon glyphicon-pencil edit" title="Editar"></span> ';
+  html += '<span class="glyphicon glyphicon-trash delete" title="Borrar"></span>';
+
+  $("#empleados-table tbody tr td.action-buttons").each(function() {
+    $(this).html(html);
+  });
+}
+
+function clearForm() {
+  $('#employee-modal :input').not(':button, :submit, :reset, :hidden, :checkbox, :radio').val('');
+  $('#employee-modal select').each(function() {
+    $(this).val($(this).find("option:first").val());
+  });
+  $('#employee-modal :checkbox, #employee-modal :radio').prop('checked', false);
+}
+
+function getErrorsPatrono() {
+  var errors = {};
+
+  // Datos del patrono
+  var poliza = $("#poliza").val().replace(/\D/g,'');
+  var tipo_cedula = $("#tipo-cedula").val();
+  var num_cedula = $("#num-cedula").val();
+  var tel = $("#tel").val().replace(/\D/g,'');
+  var fax = $("#fax").val().replace(/\D/g,'');
+  var email = $("#email").val();
+  var address_type = $("#address-type").val();
+  var address_text = $("#address-text").val();
+  // Datos de planilla
+  var month = $("#month").val();
+  var year = $("#year").val();
+  var tipo_planilla = $("#tipo-planilla").val();
+
+  if (poliza.length !== 7) {
+    errors.poliza = "El número de póliza debe ser de 7 dígitos";
+  }
+
+  if (tipo_cedula != "P") {
+    num_cedula = num_cedula.replace(/\D/g,'');
+  }
+  switch (tipo_cedula) {
+    case "CJ":
+      if (num_cedula.length !== 10) {
+        errors.num_cedula = "La cédula jurídica debe tener 10 dígitos";
+      }
+      else if (num_cedula.charAt(0) < 2 || num_cedula.charAt(0) > 4) {
+        errors.num_cedula = "La cédula jurídica debe iniciar con 2, 3 o 4";
+      }
+      break;
+    case "CN":
+      if (num_cedula.length !== 9) {
+        errors.num_cedula = "La cédula nacional debe tener 9 dígitos";
+      }
+      break;
+    case "R":
+      if (num_cedula.length !== 17) {
+        errors.num_cedula = "La cédula de residencia debe tener 17 dígitos";
+      }
+      break;
+    case "DU":
+      if (num_cedula.length !== 12) {
+        errors.num_cedula = "El documento único (DIMEX o DIDI) debe tener 12 dígitos";
+      }
+      else if (num_cedula.charAt(0) != 1 && num_cedula.charAt(0) != 5) {
+        errors.num_cedula = "El documento único (DIMEX o DIDI) debe iniciar con 1 o 5";
+      }
+      break;
+    case "P":
+      if (num_cedula.length < 4 || num_cedula.length > 11) {
+        errors.num_cedula = "El pasaporte debe ser entre 4 y 11 carácteres";
+      }
+      break;
+    default:
+      errors.tipo_cedula = "Debe seleccionar el tipo de identificación";
+  }
+
+  if (tel.length !== 8) {
+    errors.tel = "El número de teléfono debe ser de 8 dígitos";
+  }
+  else if (tel < 2000000 || tel > 99999999) {
+    errors.tel = "El número de teléfono es inválido";
+  }
+
+  if (fax.length !== 0 && fax.length !== 8) {
+    errors.fax = "El número de fax debe ser de 8 dígitos o dejado en blanco";
+  }
+  else if (fax.length === 8 && (fax < 2000000 || fax > 99999999)) {
+    errors.tel = "El número de fax es inválido";
+  }
+
+  if (email.length === 0) {
+    errors.email = "Es necesario ingresar un correo electrónico";
+  }
+  else {
+    var email_regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!(email_regex.test(email))) {
+      errors.email = "Dirección de correo electrónico inválido";
+    }
+    else if (email.length > 50) {
+      errors.email = "Por favor use un correo electrónico que tiene máximo 50 carácteres";
+    }
+  }
+
+  if (address_type == "DF") {
+    if (address_text.length < 50) {
+      errors.address_text = "La dirección física del patrono está incompleta. Recuerde indicar la provincia, el cantón y el distrito, además de otras señas que faciliten la localización.";
+    }
+    else if (address_text.length > 170) {
+      errors.address_text = "El domicilio físico del patrono excede el tamaño máximo permitido (170 caracteres)";
+    }
+  }
+  else if (address_type == "AP") {
+    var ap_regex = /\d{5}-\d{4}/;
+    if (!(ap_regex.test(address_text))) {
+      errors.address_text = "El apartado postal es incorrecto. Debe ingresar la información como se muestra en el siguiente ejemplo: 10061-1000";
+    }
+  }
+  else {
+    errors.address_type = "Seleccione el tipo de domicilio";
+  }
+
+  if (!isNormalInteger(month)) {
+    errors.month = "Seleccione el mes de la planilla";
+  }
+
+
+  if (!isNormalInteger(year)) {
+    errors.year = "Ingrese el año de la planilla";
+  }
+  else {
+    var cur_year = new Date().getFullYear();
+    if (year < 2000 || year > cur_year + 15) {
+      errors.year = "Año inválido";
+    }
+  }
+
+  if (tipo_planilla.length === 0) {
+    errors.tipo_planilla = "Seleccione el tipo de planilla";
+  }
+  else if (tipo_planilla == "N" && $("#empleados-table tbody tr").length === 0) {
+    errors.tipo_planilla = "Ha seleccionado en la casilla de Tipo de Planilla la opción INACTIVA, sin embargo aun existen trabajadores reportados en esta planilla.";
+  }
+  else if (tipo_planilla == "E" && month < 13) {
+    errors.tipo_planilla = "El Tipo de Planilla ESPECIAL solo es válido cuando el Mes seleccionado es AGUINALDO o SALARIO ESCOLAR.";
+  }
+
+  if (tipo_planilla != "E" && month >= 13) {
+    errors.tipo_planilla = "El Tipo de Planilla no coincide con el Mes de planilla. Seleccione en Tipo de Planilla la opción ESPECIAL si está reportando el Aguinaldo o el Salario Escolar.";
+  }
+
+  return errors;
+}
+
+$("#generate-txt-button").click(function() {
+  var errors = getErrorsPatrono();
+
+  if (Object.keys(errors).length > 0) {
+    var errorstr = "Errores encontrados:\n\n";
+    $.each(errors, function(key, value) {
+      errorstr += "* " + value + "\n";
+    });
+    alert(errorstr);
+  }
+  // No errors. Generate txt.
+  else {
+    // Datos del patrono
+    var poliza = $("#poliza").val().replace(/\D/g,'');
+    var tipo_cedula = $("#tipo-cedula").val();
+    var num_cedula = $("#num-cedula").val();
+    var tel = $("#tel").val().replace(/\D/g,'');
+    var fax = $("#fax").val().replace(/\D/g,'');
+    var email = $("#email").val();
+    var address_type = $("#address-type").val();
+    var address_text = $("#address-text").val();
+    // Datos de planilla
+    var month = padLeft(2, $("#month").val(), "0");
+    var year = $("#year").val();
+    var tipo_planilla = $("#tipo-planilla").val();
+
+    var txt = "";
+    var line = "";
+
+    // Line 1
+    line += poliza;
+    line += tipo_planilla;
+    line += year;
+    line += month;
+    line += " ";
+
+    switch (tipo_cedula) {
+      case "CN":
+        line += "0" + num_cedula;
+        break;
+      case "CR":
+        line += "1" + num_cedula;
+        break;
+      case "CJ":
+        line += num_cedula;
+        break;
+      case "DU":
+        line += "6" + num_cedula;
+        break;
+      case "P":
+        line += "9" + num_cedula;
+        break;
+    }
+    line = padRight(35, line, " ");
+
+    line += tel;
+    line = padRight(52, line + fax, " ");
+
+    line += "V08D";
+
+    // TODO Figure out significance of Line 1, Col 57-80 in the txt file. Until
+    // then, omit it because it still works. Generated by ActualizaEncabezado
+    // in Excel file.
+
+    line += "\r\n";
+    txt += line;
+
+    // Line 2
+    line = "Email ";
+    line = padRight(56, line + email, " ") + "\r\n";
+    txt += line;
+
+    // Line 3
+    line = (address_type == 'DF') ? "Domicilio " : "Apartado  ";
+    line = padRight(180, line + address_text.toUpperCase(), " ") + "\r\n";
+    txt += line;
+
+    // Loop over employees
+    $("#empleados-table tbody tr").each(function() {
+      line = "";
+
+      var id_type = $(this).find("td[data-col='id_type']").attr("data-val");
+      var nacionalidad = $(this).find("td[data-col='nacionalidad']").attr("data-val");
+      var id_num = $(this).find("td[data-col='id_num']").attr("data-val");
+      var num_asegurado = $(this).find("td[data-col='num_asegurado']").attr("data-val");
+      var nombre = $(this).find("td[data-col='nombre']").attr("data-val");
+      var apellido1 = $(this).find("td[data-col='apellido1']").attr("data-val");
+      var apellido2 = $(this).find("td[data-col='apellido2']").attr("data-val");
+      var jornada = $(this).find("td[data-col='jornada']").attr("data-val");
+      var dias = $(this).find("td[data-col='dias']").attr("data-val");
+      var horas = $(this).find("td[data-col='horas']").attr("data-val");
+      var salario = $(this).find("td[data-col='salario']").attr("data-val");
+      var observacion = $(this).find("td[data-col='observacion']").attr("data-val");
+      var ocupacion = $(this).find("td[data-col='ocupacion']").attr("data-val");
+
+      if (apellido2 == "") {
+        apellido2 = "...";
+      }
+      if (jornada == "01" || jornada == "03") {
+        horas = dias * 8;
+      }
+      else if (jornada == "02") {
+        horas = dias * 4;
+      }
+      else if (jornada == "04") {
+        dias = Math.round((horas / 8) + 0.5);
+      }
+
+      if (id_type == "0" && num_asegurado == id_num) {
+        num_asegurado = "0" + num_asegurado;
+      }
+      line += id_type;
+
+      if (id_type == "5") {
+        line += nacionalidad;
+        line += id_num;
+        line += padRight(1, apellido1.charAt(0), " ");
+        line += padRight(1, apellido2.charAt(0), " ");
+        line += padRight(1, nombre.charAt(0), " ");
+        line = padRight(20, line, " ");
+      }
+      else {
+        line = padRight(20, line + id_num, " ");
+      }
+
+      line = padRight(40, line + num_asegurado, " ");
+      line = padRight(55, line + nombre.toUpperCase(), " ");
+      line = padRight(70, line + apellido1.toUpperCase(), " ");
+      line = padRight(85, line + apellido2.toUpperCase(), " ");
+
+      salario = parseFloat(salario).toFixed(2); // Round to 2 d.p.
+      line += padLeft(13, salario, "0");
+      line += padLeft(3, dias, "0");
+      line += padLeft(4, horas, "0");
+
+      line += jornada;
+      line += observacion;
+      line += "0";
+      line += ocupacion;
+      line += "\r\n";
+
+      txt += line;
+    });
+
+    txt = cleanString(txt);
+
+    // Download file
+    var filename = "PL" + poliza + tipo_planilla + year + month + "-V08D (Texto).txt";
+    var element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=iso-8859-1;base64,' + window.btoa(txt));
+    element.setAttribute('download', filename);
+
+    element.style.display = 'none';
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
+
+    $("#export-month").text(month);
+    $("#export-year").text(year);
+    $("#export-poliza").text(poliza);
+    $("#export-trabajadores").text($("#empleados-table tbody tr").length);
+    $("#export-success-modal").modal();
+  }
+});
+
+// Converts all characters not found in ISO-8859-1 to ?'s
+function cleanString(input) {
+  var output = "";
+  var i = 0;
+  while (i < input.length) {
+    output += input.charCodeAt(i) <= 255 ? input.charAt(i) : '?';
+    i++;
+  }
+  return output;
+}
+
+function padRight(width, string, padding) {
+  return (width <= string.length) ? string : padRight(width, string + padding, padding);
+}
+function padLeft(width, string, padding) {
+  return (width <= string.length) ? string : padLeft(width, padding + string, padding);
+}
+
+jQuery.fn.highlight = function() {
+    $(this).each(function() {
+        var el = $(this);
+        el.before("<div/>");
+        el.prev()
+            .width(el.width())
+            .height(el.height())
+            .css({
+                "position": "absolute",
+                "background-color": "#ffff99",
+                "opacity": ".9"
+            })
+            .fadeOut(1000);
+    });
+};
+
+function isNormalInteger(str) {
+    var n = ~~Number(str);
+    return String(n) === str && n >= 0;
+}
+
+var id_types = {
+  "_-1": "(Seleccione)",
+  "_0": "Cédula nacional",
+  "_1": "Cédula de residencia, Régimen especial, Refugiado",
+  "_6": "Documento Único, DIMEX, DIDI",
+  "_9": "Pasaporte",
+  "_8": "Permiso de trabajo",
+  "_5": "Sin documentos"
+};
+
+var jornadas = {
+  "01": "Tiempo completo",
+  "02": "Medio tiempo",
+  "03": "Ocasional contratado por días",
+  "04": "Ocasional contratado por horas"
+};
+
+var observaciones = {
+  "00": "(seleccione)",
+  "01": "Entró en el mes",
+  "02": "Salió en el mes",
+  "05": "Entró y salió en el mes",
+  "03": "Incapacitado por CCSS",
+  "04": "Incapacitado por INS",
+  "06": "Licencia sin salario",
+  "07": "Licencia por maternidad",
+  "08": "Ajuste meses anteriores"
+};
+var ocupaciones = {
+  "_2421": "Abogados y notarios",
+  "_5142": "Acompañantes de bailes y de entretenimientos y trabajadores dedicados a la prostitución",
+  "_3455": "Acróbatas, magos, payasos y actores no profesionales",
+  "_2456": "Actores y directores de cine, radio, teatro y televisión",
+  "_2413": "Administradores de empresas/negocios y profesionales de la mercadotecnia",
+  "_2414": "Administradores públicos",
+  "_2412": "Administradores y especialistas en recursos humanos",
+  "_3478": "Agente de Ventas",
+  "_3473": "Agentes de bienes raíces",
+  "_3471": "Agentes de bolsa / cambio",
+  "_3483": "Agentes de colocación y contratistas de mano de obra",
+  "_3481": "Agentes de compras y consignatarios",
+  "_3472": "Agentes de seguros",
+  "_3474": "Agentes de viajes, guías y promotores turísticos",
+  "_6111": "Agricultores y trabajadores calificados de cultivos extensivos",
+  "_6114": "Agricultores y trabajadores calificados de cultivos mixtos",
+  "_6113": "Agricultores y trabajadores calificados de huertas, invernaderos, viveros y jardines",
+  "_6112": "Agricultores y trabajadores calificados de plantaciones de árboles y arbustos",
+  "_2213": "Agrónomos, ingenieros agrícolas, ingenieros forestales, ingenieros en zootecnia, ingenieros en maderas y afines",
+  "_7121": "Albañiles y mamposteros",
+  "_7321": "Alfareros y afines (barro, arcilla y abrasivos)",
+  "_2134": "Analista de Computación",
+  "_7215": "Aparejadores y empalmadores de cables",
+  "_6123": "Apicultores y sericicultores y trabajadores calificados de la apicultura y la sericicultura",
+  "_2141": "Arquitectos y Urbanistas",
+  "_7333": "Arreglistas florales",
+  "_7331": "Artesanos de la madera y materiales similares",
+  "_7332": "Artesanos de los tejidos y el cuero",
+  "_9156": "Ascensorista",
+  "_5133": "Asistente Domiciliario de Ancianos",
+  "_3311": "Asistente Profesor Parauniversitario",
+  "_3330": "Asistentes de la enseñanza especial",
+  "_3322": "Asistentes de la enseñanza preescolar",
+  "_3321": "Asistentes de la enseñanza primaria",
+  "_3310": "Asistentes de profesores universitarios y parauniversitarios",
+  "_5144": "Astrólogos, adivinadores y quirománticos",
+  "_2451": "Autores literarios y otros escritores",
+  "_3226": "Auxiliares de enfermería",
+  "_3460": "Auxiliares de servicios laicos y técnicos y asistentes en teología y filosofía",
+  "_3222": "Auxiliares y asistentes de odontología",
+  "_6122": "Avicultores y trabajadores calificados de la avicultura",
+  "_9324": "Ayudante de artes gráficas",
+  "_9155": "Ayudante de cocina",
+  "_9314": "Ayudante de electricista",
+  "_9323": "Ayudante de mecánico",
+  "_7124": "Ayudante de Operario de Construcción",
+  "_9325": "Ayudante de panadería",
+  "_5132": "Ayudantes de enfermería",
+  "_5110": "Azafatas y sobrecargos",
+  "_5154": "Baqueano",
+  "_5125": "Bartender (Coctelero)",
+  "_2432": "Bibliotecarios, documentalistas y afines",
+  "_2211": "Biólogos, botánicos, bacteriólogos, citólogos, zoólogos, microbiólogos, genetistas, ecólogos y afines",
+  "_5151": "Bomberos",
+  "_7436": "Bordadores, confeccionadores de flores de tela y de peluches, confeccionadores de carpas, toldos y artículos similares, paragüeros y afines",
+  "_9157": "Botones",
+  "_4211": "Cajeros",
+  "_7341": "Cajistas, tipógrafos, linotipistas y afines",
+  "_7213": "Caldereros y chapistas",
+  "_5123": "Camareros, meseros y cantineros",
+  "_3163": "Camarógrafo de Prensa",
+  "_3172": "Capitanes, oficiales de cubierta y prácticos",
+  "_6142": "Carboneros de carbón vegetal y afines",
+  "_7411": "Carniceros y afines",
+  "_7123": "Carpinteros",
+  "_3148": "Cartógrafos, agrimensores y peritos topógrafos",
+  "_7415": "Catadores y clasificadores de alimentos y bebidas",
+  "_6153": "Cazadores y tramperos",
+  "_7424": "Cesteros y afines",
+  "_3181": "Chefs",
+  "_8317": "Chofer Cobrador de Bus",
+  "_8316": "Chofer de Bus No Cobrador",
+  "_4215": "Cobradores",
+  "_9154": "Cobradores de transportes públicos",
+  "_5122": "Cocineros",
+  "_7132": "Colocadores de suelos",
+  "_2454": "Compositores, músicos y cantantes profesionales",
+  "_8313": "Conductores de autobuses, microbuses y tranvías",
+  "_8314": "Conductores de camiones pesados",
+  "_8311": "Conductores de motocicletas",
+  "_8312": "Conductores de taxis y automóviles para transporte (incluye ambulancias)",
+  "_9331": "Conductores de vehículos accionados a pedal o a brazo",
+  "_9332": "Conductores de vehículos y máquinas de tracción animal",
+  "_7417": "Confitero, Chocolatero y Fabricación de Pastas Alimenticias",
+  "_3214": "Consejeros agrícolas, forestales y pecuarios",
+  "_9134": "Conserjes",
+  "_7312": "Constructores y afinadores de instrumentos musicales",
+  "_3410": "Contador Privado",
+  "_2411": "Contadores públicos y auditores",
+  "_3175": "Controladores de trafico aéreo",
+  "_3173": "Controladores de trafico marítimo",
+  "_2455": "Coreógrafos, directores de danza y bailarines profesionales",
+  "_4143": "Correctores de pruebas de imprenta",
+  "_6151": "Criadores de especies acuáticas",
+  "_6121": "Criadores de ganado y otros animales domésticos y productores de leche y sus derivados",
+  "_6124": "Criadores y trabajadores calificados que combinan la cría de diferentes tipos de animales",
+  "_7135": "Cristaleros",
+  "_7441": "Curtidores, pellejeros y afines",
+  "_3482": "Declarantes y agentes de aduanas",
+  "_3454": "Decoradores, diseñadores y tramoyistas",
+  "_3141": "Delineantes  y  dibujantes técnicos",
+  "_5225": "Demostrador",
+  "_3484": "Despachador, Agente de Aduana Vapores",
+  "_4123": "Digitador de Datos",
+  "_7112": "Dinamiteros",
+  "_1132": "Directivos y dirigentes de organizaciones humanitarias, religiosas, ecologistas, de promoción social, deportivas y otras especializadas sin fines de lucro",
+  "_1131": "Directivos y dirigentes de partidos políticos, de grupos y cámaras empresariales, de organizaciones de trabajadores, de asociaciones y colegios profesionales y de otras organizaciones de interés socioeconómico",
+  "_2131": "Diseñadores y analistas de sistemas informáticos",
+  "_7422": "Ebanistas",
+  "_2415": "Economistas y economistas agrícolas",
+  "_2333": "Educador Aspirante Sin Título",
+  "_7137": "Electricistas de obras y afines",
+  "_9322": "Empacadores manuales y otros peones de la industria manufacturera",
+  "_4134": "Empleado Despacho General",
+  "_4221": "Empleados de agencias de viajes",
+  "_4141": "Empleados de bibliotecas y archivos y fotocopiadores",
+  "_4121": "Empleados de contabilidad y finanzas",
+  "_4131": "Empleados de control de abastecimiento e inventario",
+  "_4132": "Empleados de control de la producción (calculo de materiales)",
+  "_4133": "Empleados de control de transporte",
+  "_4142": "Empleados del servicio de correos",
+  "_9131": "Empleados domésticos",
+  "_7235": "Encargado de Cámaras Frigoríficas",
+  "_7125": "Encargado de Mantenimiento de Edificios",
+  "_3164": "Encargado Generador de Caracteres Y Similares de Televisión",
+  "_3135": "Encargado Mantenimiento Computadoras (Preventivo)",
+  "_7348": "Encuadernador en Fino",
+  "_7349": "Encuadernador Rústico",
+  "_7345": "Encuadernadores, empastadores y afines",
+  "_4122": "Encuestadores, codificadores y digitadores de datos",
+  "_7144": "Enderezador Automotriz",
+  "_2226": "Enfermeros profesionales",
+  "_7245": "Ensamblador de Computadoras",
+  "_2355": "Entrenadores deportivos de nivel profesional",
+  "_2453": "Escultores, pintores, grabadores, dibujantes, artistas gráficos y afines",
+  "_2351": "Especialistas en métodos pedagógicos y material didáctico",
+  "_2122": "Estadísticos y demógrafos",
+  "_7342": "Estereotipistas y galvanotipistas",
+  "_9333": "Estibadores",
+  "_7143": "Exterminadores de insectos y roedores, deshollinadores, limpiadores de fachadas y afines",
+  "_2224": "Farmacéuticos",
+  "_2212": "Farmacólogos, patólogos, anatomistas, bioquímicos, biofísicos, fisiólogos y afines",
+  "_2444": "Filólogos y traductores",
+  "_2111": "Físicos y astrónomos",
+  "_7136": "Fontaneros e instaladores de tuberías",
+  "_3161": "Fotógrafos y operadores de equipo de grabación de imagen y operadores técnicos de equipo de grabación y reproducción de sonido",
+  "_8213": "Fresador (Metalmécanica)",
+  "_4224": "Funcionarios de servicios de expedición de licencias y permisos",
+  "_2114": "Geólogos y geofísicos",
+  "_1122": "Gerentes y subgerentes generales, directores y subdirectores generales y coordinadores generales de instituciones públicas y de empresas privadas",
+  "_9158": "Gondolero",
+  "_7343": "Grabadores de imprenta y fotograbadores",
+  "_7323": "Grabadores de vidrio",
+  "_5153": "Guardas de prisión",
+  "_9152": "Guardianes y porteros",
+  "_7222": "Herramentistas, cerrajeros y armeros",
+  "_7221": "Herreros y forjadores",
+  "_3227": "Higienistas",
+  "_2443": "Historiadores y politólogos",
+  "_7346": "Impresores de serigrafía y estampadores a la plancha y en textiles",
+  "_2142": "Ingenieros civiles y en construcción",
+  "_2143": "Ingenieros electricistas",
+  "_2144": "Ingenieros electrónicos y en telecomunicaciones",
+  "_2147": "Ingenieros industriales",
+  "_2145": "Ingenieros mecánicos",
+  "_2146": "Ingenieros químicos y tecnólogos de alimentos",
+  "_2148": "Ingenieros topógrafos y en geodesia",
+  "_3153": "Inspectores de control de calidad",
+  "_3151": "Inspectores de edificios y de prevención e investigación de incendios",
+  "_2352": "Inspectores de la enseñanza",
+  "_3491": "Inspectores de Policía y Detectives",
+  "_3152": "Inspectores de seguridad y salud",
+  "_7134": "Instaladores de material aislante",
+  "_7244": "Instaladores y reparadores de líneas eléctricas",
+  "_7243": "Instaladores y reparadores de telégrafos y teléfonos",
+  "_3444": "Intérpretes y técnicos y asistentes en filología y lingüística y en traducción",
+  "_2353": "Investigadores en docencia y desarrollo y adecuación curricular",
+  "_1133": "Jefes de pequeñas poblaciones",
+  "_1124": "Jefes de sección de instituciones públicas y empresas privadas",
+  "_1123": "Jefes o coordinadores de áreas o departamentos de instituciones públicas y empresas privadas",
+  "_7313": "Joyeros, orfebres y plateros",
+  "_2115": "Laboratorista Clínico",
+  "_9136": "Lavador Cabinas Telefónicas",
+  "_5146": "Lavador de Cabello",
+  "_9135": "Lavadores de vehículos y ventanas",
+  "_9133": "Lavanderos y planchadores manuales",
+  "_9153": "Lectores de medidores y recolectores de dinero en aparatos de venta automática",
+  "_4113": "Levantador de Texto (Artes Gráficas)",
+  "_9120": "Limpiabotas y otros trabajadores de servicios prestados en la calle",
+  "_7145": "Limpiador de Tanques Sépticos",
+  "_9132": "Limpiadores de oficinas, hoteles y otros establecimientos",
+  "_7347": "Linotipista (Artes Gráficas)",
+  "_8233": "Llantero",
+  "_3459": "Locutor de Television",
+  "_2340": "Maestros de la enseñanza especial",
+  "_2332": "Maestros de la enseñanza preescolar",
+  "_2331": "Maestros de la enseñanza primaria",
+  "_3182": "Maitres",
+  "_5145": "Manicurista y Maquilladora",
+  "_8315": "Maquinistas de locomotoras, guardafrenos, guardagujas y agentes de maniobras",
+  "_8330": "Marineros de cubierta y afines",
+  "_2121": "Matemáticos y actuarios",
+  "_5121": "Mayordomos y afines",
+  "_7246": "Mecánico General Excepto Máquinas de Coser Industrial",
+  "_7233": "Mecánicos y ajustadores de máquinas agrícolas e industriales",
+  "_7232": "Mecánicos y ajustadores de motores de avión",
+  "_7231": "Mecánicos y ajustadores de vehículos",
+  "_7241": "Mecánicos y ajustadores electricistas",
+  "_7311": "Mecánicos y reparadores de instrumentos de precisión",
+  "_7242": "Mecánicos, reparadores y ajustadores electrónicos",
+  "_4111": "Mecanógrafos, digitadores de texto y operadores de máquinas de envío y recepción de mensajes (telefax, telex, etc.)",
+  "_2227": "Médico Especialista",
+  "_2221": "Médicos generales y especialistas",
+  "_9151": "Mensajeros, ascensoristas, botones, maleteros, caddies y repartidores",
+  "_2112": "Meteorólogos",
+  "_1111": "Miembros de más alto nivel de los poderes de la república (Del poder ejecutivo, del poder legislativo, del poder judicial y del tribunal supremo de elecciones)",
+  "_7111": "Mineros y canteros",
+  "_9137": "Misceláneo Hogares Tercera Edad",
+  "_5210": "Modelos de modas, arte y publicidad",
+  "_7211": "Moldeadores",
+  "_8282": "Montadores de equipos eléctricos",
+  "_8283": "Montadores de equipos electrónicos",
+  "_7214": "Montadores de estructuras metálicas",
+  "_8281": "Montadores de mecanismos y elementos mecánicos de máquinas",
+  "_8286": "Montadores de productos de cartón, textiles y materiales afines",
+  "_8285": "Montadores de productos de madera y de materiales afines",
+  "_8284": "Montadores de productos metálicos, de caucho y de material plástico",
+  "_3453": "Músicos, cantantes y bailarines no profesionales",
+  "_5131": "Niñeras",
+  "_2225": "Nutricionistas",
+  "_2222": "Odontólogos",
+  "_3171": "Oficiales de máquinas",
+  "_4149": "Oficinista",
+  "_3134": "Operador de Computación y Encargado de Mantenimiento de Computadoras (Correctivo)",
+  "_8130": "Operador de Hornos de Vidriería y Ceramica, Operador de Máquinas Afines",
+  "_8267": "Operador de Máquina de Lavar Ropa",
+  "_8214": "Operador de Maquinaria Pesada",
+  "_8257": "Operador de Máquinas de Encuadernación (Guillotinista Eléctrico)",
+  "_8230": "Operador de Máquinas Para Fabricar Productos de Caucho y de Plástico",
+  "_4144": "Operador de Polígrafo o Encargado De Fotocopiadora",
+  "_8254": "Operador de Prensa Rotativa",
+  "_3133": "Operador de Scanner  Separador de Colores",
+  "_8190": "Operadores de cadenas de montaje automatizado y de robots industriales",
+  "_3162": "Operadores de equipo de radiodifusión, de cine, de televisión y de telecomunicaciones",
+  "_8154": "Operadores de equipos de destilación y de reacción química",
+  "_8153": "Operadores de equipos de filtración y separación de sustancias químicas",
+  "_8323": "Operadores de grúas, de aparatos elevadores y afines",
+  "_8121": "Operadores de hornos de minerales y de hornos de primera fusión de metales",
+  "_8163": "Operadores de incineradores, instalaciones de tratamiento de agua y afines",
+  "_8141": "Operadores de instalaciones de procesamiento de la  madera",
+  "_8112": "Operadores de instalaciones de procesamiento de minerales y rocas",
+  "_8161": "Operadores de instalaciones de producción de energía",
+  "_8155": "Operadores de instalaciones de refinación de petróleo y gas natural",
+  "_8152": "Operadores de instalaciones de tratamiento químico térmico",
+  "_8123": "Operadores de instalaciones de tratamiento térmico de metales",
+  "_8111": "Operadores de instalaciones mineras",
+  "_8142": "Operadores de instalaciones para la preparación de pasta para papel",
+  "_8151": "Operadores de instalaciones quebrantadoras, trituradoras y mezcladoras de sustancias químicas",
+  "_8321": "Operadores de maquinaria agrícola y forestal motorizada",
+  "_8264": "Operadores de máquinas de blanqueo, teñido y tintura",
+  "_8252": "Operadores de máquinas de encuadernación",
+  "_8251": "Operadores de máquinas de imprenta",
+  "_8322": "Operadores de máquinas de movimiento de tierras y afines",
+  "_8261": "Operadores de máquinas de preparación de fibras, hilado y devanado",
+  "_8265": "Operadores de máquinas de tratamiento de pieles y cueros",
+  "_8162": "Operadores de máquinas de vapor y calderas",
+  "_8211": "Operadores de máquinas herramientas",
+  "_8263": "Operadores de máquinas para coser",
+  "_8274": "Operadores de máquinas para elaborar cereales, productos de panadería y repostería, golosinas, artículos de chocolate y productos similares",
+  "_8278": "Operadores de máquinas para elaborar cerveza, vino y otras bebidas excepto jugos de frutas y verduras",
+  "_8279": "Operadores de máquinas para elaborar productos del tabaco",
+  "_8272": "Operadores de máquinas para elaborar productos lácteos",
+  "_8277": "Operadores de máquinas para elaborar té y procesar café y cacao",
+  "_8223": "Operadores de máquinas para fabricar accesorios fotográficos",
+  "_8276": "Operadores de máquinas para fabricar azúcares",
+  "_8212": "Operadores de máquinas para fabricar cemento y otros productos minerales",
+  "_8231": "Operadores de máquinas para fabricar productos de caucho",
+  "_8240": "Operadores de máquinas para fabricar productos de madera",
+  "_8232": "Operadores de máquinas para fabricar productos de material plástico",
+  "_8253": "Operadores de máquinas para fabricar productos de papel",
+  "_8221": "Operadores de máquinas para fabricar productos farmacéuticos y cosméticos",
+  "_8266": "Operadores de máquinas para la fabricación de calzado, bolsos, maletas y otros artículos principalmente de cuero",
+  "_8273": "Operadores de máquinas para moler cereales y especias",
+  "_8271": "Operadores de máquinas para procesar carne, pescado y mariscos",
+  "_8275": "Operadores de máquinas para procesar frutas húmedas y secas, hortalizas y elaborar aceites comestibles",
+  "_8222": "Operadores de máquinas pulidoras, galvanizadoras y recubridoras de metales",
+  "_8124": "Operadores de máquinas trefiladoras y estiradoras de metales",
+  "_8324": "Operadores de montacargas",
+  "_8262": "Operadores de telares y otras máquinas tejedoras",
+  "_7122": "Operarios en cemento armado",
+  "_5124": "Organizadores de fiestas, eventos y convenciones (catering service)",
+  "_2354": "Orientadores estudiantiles",
+  "_4190": "Oros empleados de apoyo al proceso administrativo (Empleados de registro de personal, etc.)",
+  "_6119": "Otro Agricultor de Cultivos Mixtos y Afines",
+  "_3489": "Otros agentes comerciales y corredores",
+  "_6115": "Otros agricultores y trabajadores calificados de los cultivos que solo realizan labores muy particulares",
+  "_7129": "Otros albañiles, carpinteros y afines",
+  "_6129": "Otros criadores y trabajadores calificados de la cría de animales",
+  "_7234": "Otros mecánicos y ajustadores de máquinas",
+  "_8159": "Otros operadores de instalaciones de tratamientos químicos",
+  "_8139": "Otros operadores de instalaciones de vidriería, cerámica y afines",
+  "_8229": "Otros operadores de máquinas para fabricar productos químicos",
+  "_8269": "Otros operadores de máquinas para fabricar productos textiles y artículos de piel y cuero",
+  "_8290": "Otros operadores de máquinas y montadores",
+  "_9334": "Otros peones de transporte",
+  "_2149": "Otros profesionales de la arquitectura y la ingeniería excepto de la informática y de la agronomía",
+  "_2139": "Otros profesionales de la informática; EJ: Auditores de sistemas informáticos",
+  "_2429": "Otros profesionales del derecho",
+  "_2229": "Otros profesionales en ciencias de la salud",
+  "_2449": "Otros profesionales en ciencias sociales",
+  "_3189": "Otros supervisores de personal",
+  "_3199": "Otros supervisores de producción (de la industria minera, empaque)",
+  "_3229": "Otros técnicos de las ciencias de la salud",
+  "_3419": "Otros técnicos en administración y en economía",
+  "_3149": "Otros técnicos en arquitectura y la ingeniería excepto la informática y la agronomía",
+  "_3139": "Otros técnicos en informática",
+  "_3239": "Otros técnicos en operación de equipo de diagnóstico y tratamiento medico",
+  "_3479": "Otros técnicos en operaciones financieras y comerciales",
+  "_3449": "Otros técnicos y asistentes en ciencias sociales",
+  "_3429": "Otros técnicos y asistentes legales (Inspectores de cobros judiciales)",
+  "_7219": "Otros trabajadores de estructuras metálicas",
+  "_5139": "Otros trabajadores de los cuidados a personas y afines",
+  "_9159": "Otros trabajadores no calificados de los servicios",
+  "_5159": "Otros trabajadores que prestan servicios de protección y vigilancia",
+  "_4212": "Pagadores y cobradores de ventanilla",
+  "_7412": "Panaderos, pasteleros, golosineros, confiteros, chocolateros y fabricantes de pastas alimenticias",
+  "_7435": "Patronistas y cortadores de tela, cuero y pieles",
+  "_7434": "Peleteros",
+  "_5141": "Peluqueros, peinadores, especialistas en tratamientos de belleza y afines",
+  "_9213": "Peón Agrícola Labores Pesadas",
+  "_9335": "Peón de Bodega",
+  "_9336": "Peón de Bodega Fría",
+  "_9214": "Peón de Jardín",
+  "_9211": "Peones agropecuarios (excepto recolectores de café)",
+  "_9313": "Peones de la construcción",
+  "_9222": "Peones de la pesca, la caza y la trampa",
+  "_9311": "Peones de minas y canteras",
+  "_9321": "Peones de montaje",
+  "_9312": "Peones de obras públicas y mantenimiento de carreteras, presas y obras similares (incluye cementerios)",
+  "_9221": "Peones forestales",
+  "_8113": "Perforadores de pozos y afines",
+  "_2452": "Periodistas",
+  "_3418": "Peritos tributarios",
+  "_1121": "Personal de nivel directivo de la administración pública",
+  "_5143": "Personal de servicios funerarios (excepto sepultureros) y embalsamadores",
+  "_6152": "Pescadores de agua dulce, aguas costeras y alta mar",
+  "_3174": "Pilotos de avión",
+  "_7142": "Pintores de automóviles, barnizadores, laqueadores y afines",
+  "_7324": "Pintores de rótulos y pintores decoradores de vidrio, cerámica y materiales similares",
+  "_7141": "Pintores y empapeladores",
+  "_5224": "Pistero",
+  "_2447": "Planificadores económico - sociales",
+  "_5152": "Policías e inspectores de tránsito",
+  "_3221": "Practicantes médicos y paramédicos",
+  "_8258": "Prensista (Artes Gráficas)",
+  "_7431": "Preparadores de fibras",
+  "_3456": "Preparadores físicos, deportistas y árbitros deportivos",
+  "_4214": "Prestamistas",
+  "_6130": "Productores y trabajadores agropecuarios calificados",
+  "_2431": "Profesionales en archivo y conservadores y curadores de museos y galerías de arte",
+  "_2311": "Profesor Parauniversitario",
+  "_2320": "Profesores de la enseñanza secundaria",
+  "_3341": "Profesores e instructores de la enseñanza no regular artística y técnica - comercial",
+  "_3342": "Profesores e instructores de otra enseñanza no regular",
+  "_2310": "Profesores universitarios y parauniversitarios",
+  "_3136": "Programador de Computación",
+  "_2132": "Programadores informáticos",
+  "_2445": "Psicólogos",
+  "_7224": "Pulidores de metales y afiladores de herramientas",
+  "_2113": "Químicos",
+  "_4222": "Recepcionistas y empleados de informaciones",
+  "_4213": "Receptores de apuestas",
+  "_9141": "Recolectores de basura",
+  "_9212": "Recolectores de café",
+  "_7423": "Reguladores y reguladores - operadores de máquinas de labrar madera",
+  "_7223": "Reguladores y reguladores - operadores de máquinas herramientas",
+  "_2441": "Relacionistas públicos y publicistas",
+  "_9337": "Repartidor Cargas Livianas",
+  "_3475": "Representantes comerciales y técnicos en ventas",
+  "_1112": "Representantes de los gobiernos locales",
+  "_7344": "Reveladores y reproductores de películas fotográficas",
+  "_7133": "Revocadores",
+  "_6125": "Sabanero",
+  "_2461": "Sacerdotes de distintas religiones, monjas y monjes",
+  "_5126": "Salonero",
+  "_7433": "Sastres, costureros, modistos, confeccionadores de cortinas, edredones y ropa de cama y sombrereros",
+  "_4112": "Secretarios",
+  "_3417": "Secretarios ejecutivos y secretarios ejecutivos bilingües",
+  "_2442": "Sociólogos, antropólogos, arqueólogos, etnólogos, geógrafos y afines",
+  "_7212": "Soldadores y oxicortadores",
+  "_7322": "Sopladores, modeladores, laminadores, cortadores y pulidores de vidrios",
+  "_3190": "Supervisor de Producción",
+  "_3184": "Supervisores de campo (encuestas)",
+  "_3183": "Supervisores de display",
+  "_3185": "Supervisores de trabajadores agrícolas, agropecuarios y pesqueros",
+  "_3197": "Supervisores de trabajadores de fabricación de alimentos, bebidas y tabaco",
+  "_3191": "Supervisores de trabajadores de fabricación de artículos de madera",
+  "_3194": "Supervisores de trabajadores de fabricación de productos de caucho, material plástico, vidrio y cerámica",
+  "_3195": "Supervisores de trabajadores de fabricación de productos de papel",
+  "_3198": "Supervisores de trabajadores de fabricación de productos eléctricos y electrónicos",
+  "_3193": "Supervisores de trabajadores de fabricación de productos químicos (farmacéuticos, cosméticos, accesorios fotográficos, etc.)",
+  "_3196": "Supervisores de trabajadores de fabricación de productos textiles y artículos de piel y cuero",
+  "_3192": "Supervisores de trabajadores de producción de energía y tratamiento de aguas",
+  "_6141": "Taladores y otros trabajadores forestales",
+  "_7437": "Tapiceros, colchoneros, personal de instalación de cortinas y alfombras y afines",
+  "_7131": "Techadores",
+  "_3236": "Técnico en Lentes de Contacto",
+  "_3234": "Técnico en operación de equipo para tratamiento médico (Radiología, rayos láser, medicina nuclear, etc.)",
+  "_3457": "Técnico en Periodismo",
+  "_3140": "Técnico en Refrigeración Doméstica o Máquinas de Coser Industrial",
+  "_3123": "Técnico en Registros Médicos",
+  "_3492": "Técnicos de apoyo a la investigación criminológica",
+  "_3213": "Técnicos en agronomía, ingeniería agrícola, ingeniería forestal, zootecnia, ingeniería en maderas y afines",
+  "_3232": "Técnicos en audiometría",
+  "_3132": "Técnicos en control de equipos informáticos",
+  "_3452": "Técnicos en dibujo artístico",
+  "_3233": "Técnicos en operación de equipo para diagnóstico médico (Operadores electrocardiografía, electroencefalografía, etc.)",
+  "_3231": "Técnicos en optometría y asistentes de oftalmología",
+  "_3451": "Técnicos en periodismo, locutores, presentadores, animadores y comentaristas de radio y televisión y maestros de ceremonias",
+  "_3131": "Técnicos en programación informática",
+  "_3476": "Técnicos en proveeduría",
+  "_3146": "Técnicos en química industrial y en tecnología de alimentos",
+  "_3176": "Técnicos en seguridad aeronáutica",
+  "_3477": "Técnicos en tasación y subasta y peritos valuadores",
+  "_3421": "Técnicos y asistentes en abogacía y notariado",
+  "_3413": "Técnicos y asistentes en administración de empresas/negocios y en mercadeo",
+  "_3414": "Técnicos y asistentes en administración pública",
+  "_3431": "Técnicos y asistentes en archivo y en conservación de museos y galerías de arte",
+  "_3432": "Técnicos y asistentes en bibliotecología, documentación y afines",
+  "_3211": "Técnicos y asistentes en biología, botánica, bacteriología, citología, zoología, microbiología, genética, ecología y afines",
+  "_3416": "Técnicos y asistentes en comercio internacional",
+  "_3225": "Técnicos y asistentes en dietética y nutrición",
+  "_3415": "Técnicos y asistentes en economía y en economía agrícola",
+  "_3143": "Técnicos y asistentes en electricidad y electrotecnia",
+  "_3144": "Técnicos y asistentes en electrónica y en telecomunicaciones",
+  "_3122": "Técnicos y asistentes en estadística y demografía",
+  "_3224": "Técnicos y asistentes en farmacia",
+  "_3212": "Técnicos y asistentes en farmacología, patología, anatomía, bioquímica, biofísica, fisiología y afines",
+  "_3111": "Técnicos y asistentes en física y astronomía",
+  "_3114": "Técnicos y asistentes en geología y geofísica",
+  "_3443": "Técnicos y asistentes en historia y politología",
+  "_3142": "Técnicos y asistentes en ingeniería civil y en construcción y maestros de obras",
+  "_3147": "Técnicos y asistentes en ingeniería industrial",
+  "_3121": "Técnicos y asistentes en matemática y actuariado",
+  "_3145": "Técnicos y asistentes en mecánica",
+  "_3112": "Técnicos y asistentes en meteorología",
+  "_3228": "Técnicos y asistentes en ortopedia, fisioterapia, rehabilitación física, terapia ocupacional, ergoterapia, ortofonía y ortóptica",
+  "_3445": "Técnicos y asistentes en psicología",
+  "_3113": "Técnicos y asistentes en química",
+  "_3412": "Técnicos y asistentes en recursos humanos",
+  "_3441": "Técnicos y asistentes en relaciones públicas y publicidad",
+  "_3442": "Técnicos y asistentes en sociología, antropología, arqueología, geografía y afines",
+  "_3446": "Técnicos y asistentes en trabajo social y en planificación económica y social",
+  "_3223": "Técnicos y asistentes veterinarios",
+  "_3411": "Técnicos y auxiliares de contabilidad y auditoría",
+  "_7432": "Tejedores con telares o de tejidos de punto y afines",
+  "_4223": "Telefonistas",
+  "_2462": "Teólogos y filósofos",
+  "_6210": "Trabajadores agropecuarios y pesqueros de subsistencia",
+  "_7414": "Trabajadores de la conservación de frutas, legumbres, verduras y afines",
+  "_7413": "Trabajadores de la elaboración de productos lácteos",
+  "_7416": "Trabajadores de la elaboración de tabaco y sus derivados",
+  "_7421": "Trabajadores del tratamiento de la madera",
+  "_2446": "Trabajadores sociales y orientadores sociales",
+  "_3485": "Tramitador-Abridor Aduanal",
+  "_7113": "Tronzadores y labrantes",
+  "_9113": "Vendedores a domicilio y por teléfono",
+  "_9111": "Vendedores ambulantes de productos comestibles",
+  "_9112": "Vendedores ambulantes de productos no comestibles (incluye fotógrafos ambulantes)",
+  "_5222": "Vendedores de puestos de mercado",
+  "_9114": "Vendedores de puestos fijos en la calle",
+  "_9115": "Vendedores en su propia casa",
+  "_5221": "Vendedores y demostradores de tiendas y almacenes",
+  "_5223": "Verdulero",
+  "_2223": "Veterinarios",
+  "_7442": "Zapateros y afines (talabarteros)"
+};
+
+var nacionalidades = {
+  "-1": "(Seleccione)",
+  "AF": "Afganistán",
+  "AL": "Albania",
+  "DE": "Alemania",
+  "AD": "Andorra",
+  "AO": "Angola",
+  "AI": "Anguilla",
+  "AQ": "Antártida",
+  "AG": "Antigua y Barbuda",
+  "AN": "Antillas Neerlandesas",
+  "SA": "Arabia Saudí",
+  "DZ": "Argelia",
+  "AR": "Argentina",
+  "AM": "Armenia",
+  "AW": "Aruba",
+  "MK": "ARY Macedonia",
+  "AU": "Australia",
+  "AT": "Austria",
+  "AZ": "Azerbaiyán",
+  "BS": "Bahamas",
+  "BH": "Bahréin",
+  "BD": "Bangladesh",
+  "BB": "Barbados",
+  "BE": "Bélgica",
+  "BZ": "Belice",
+  "BJ": "Benin",
+  "BM": "Bermudas",
+  "BT": "Bhután",
+  "BY": "Bielorrusia",
+  "BO": "Bolivia",
+  "BA": "Bosnia y Herzegovina",
+  "BW": "Botsuana",
+  "BR": "Brasil",
+  "BN": "Brunéi",
+  "BG": "Bulgaria",
+  "BF": "Burkina Faso",
+  "BI": "Burundi",
+  "CV": "Cabo Verde",
+  "KH": "Camboya",
+  "CM": "Camerún",
+  "CA": "Canadá",
+  "TD": "Chad",
+  "CL": "Chile",
+  "CN": "China",
+  "CY": "Chipre",
+  "VA": "Ciudad del Vaticano",
+  "CO": "Colombia",
+  "KM": "Comoras",
+  "CG": "Congo",
+  "KP": "Corea del Norte",
+  "KR": "Corea del Sur",
+  "CI": "Costa de Marfil",
+  "CR": "Costa Rica",
+  "HR": "Croacia",
+  "CU": "Cuba",
+  "DK": "Dinamarca",
+  "DM": "Dominica",
+  "EC": "Ecuador",
+  "EG": "Egipto",
+  "SV": "El Salvador",
+  "AE": "Emiratos Árabes Unidos",
+  "ER": "Eritrea",
+  "SK": "Eslovaquia",
+  "SI": "Eslovenia",
+  "ES": "España",
+  "US": "Estados Unidos",
+  "EE": "Estonia",
+  "ET": "Etiopía",
+  "PH": "Filipinas",
+  "FI": "Finlandia",
+  "FJ": "Fiyi",
+  "FR": "Francia",
+  "GA": "Gabón",
+  "GM": "Gambia",
+  "GE": "Georgia",
+  "GH": "Ghana",
+  "GI": "Gibraltar",
+  "GD": "Granada",
+  "GR": "Grecia",
+  "GL": "Groenlandia",
+  "GP": "Guadalupe",
+  "GU": "Guam",
+  "GT": "Guatemala",
+  "GF": "Guayana Francesa",
+  "GN": "Guinea",
+  "GQ": "Guinea Ecuatorial",
+  "GW": "Guinea-Bissau",
+  "GY": "Guyana",
+  "HT": "Haití",
+  "HN": "Honduras",
+  "HK": "Hong Kong",
+  "HU": "Hungría",
+  "IN": "India",
+  "ID": "Indonesia",
+  "IR": "Irán",
+  "IQ": "Iraq",
+  "IE": "Irlanda",
+  "BV": "Isla Bouvet",
+  "CX": "Isla de Navidad",
+  "NF": "Isla Norfolk",
+  "IS": "Islandia",
+  "AX": "Islas Åland",
+  "KY": "Islas Caimán",
+  "CC": "Islas Cocos",
+  "CK": "Islas Cook",
+  "FO": "Islas Feroe",
+  "GS": "Islas Georgias del Sur y Sandwich del Sur",
+  "HM": "Islas Heard y McDonald",
+  "FK": "Islas Malvinas",
+  "MP": "Islas Marianas del Norte",
+  "MH": "Islas Marshall",
+  "PN": "Islas Pitcairn",
+  "SB": "Islas Salomón",
+  "TC": "Islas Turcas y Caicos",
+  "UM": "Islas ultramarinas de Estados Unidos",
+  "VG": "Islas Vírgenes Británicas",
+  "VI": "Islas Vírgenes de los Estados Unidos",
+  "IL": "Israel",
+  "IT": "Italia",
+  "JM": "Jamaica",
+  "JP": "Japón",
+  "JO": "Jordania",
+  "KZ": "Kazajstán",
+  "KE": "Kenia",
+  "KG": "Kirguistán",
+  "KI": "Kiribati",
+  "KW": "Kuwait",
+  "LA": "Laos",
+  "LS": "Lesotho",
+  "LV": "Letonia",
+  "LB": "Líbano",
+  "LR": "Liberia",
+  "LY": "Libia",
+  "LI": "Liechtenstein",
+  "LT": "Lituania",
+  "LU": "Luxemburgo",
+  "MO": "Macao",
+  "MG": "Madagascar",
+  "MY": "Malasia",
+  "MW": "Malawi",
+  "MV": "Maldivas",
+  "ML": "Malí",
+  "MT": "Malta",
+  "MA": "Marruecos",
+  "MQ": "Martinica",
+  "MU": "Mauricio",
+  "MR": "Mauritania",
+  "YT": "Mayotte",
+  "MX": "México",
+  "FM": "Micronesia",
+  "MD": "Moldavia",
+  "MC": "Mónaco",
+  "MN": "Mongolia",
+  "MS": "Montserrat",
+  "MZ": "Mozambique",
+  "MM": "Myanmar",
+  "NA": "Namibia",
+  "NR": "Nauru",
+  "NP": "Nepal",
+  "NI": "Nicaragua",
+  "NE": "Níger",
+  "NG": "Nigeria",
+  "NU": "Niue",
+  "NO": "Noruega",
+  "NC": "Nueva Caledonia",
+  "NZ": "Nueva Zelanda",
+  "OM": "Omán",
+  "NL": "Países Bajos",
+  "PK": "Pakistán",
+  "PW": "Palau",
+  "PS": "Palestina",
+  "PA": "Panamá",
+  "PG": "Papúa Nueva Guinea",
+  "PY": "Paraguay",
+  "PE": "Perú",
+  "PF": "Polinesia Francesa",
+  "PL": "Polonia",
+  "PT": "Portugal",
+  "PR": "Puerto Rico",
+  "QA": "Qatar",
+  "GB": "Reino Unido",
+  "CF": "República Centroafricana",
+  "CZ": "República Checa",
+  "CD": "República Democrática del Congo",
+  "DO": "República Dominicana",
+  "RE": "Reunión",
+  "RW": "Ruanda",
+  "RO": "Rumania",
+  "RU": "Rusia",
+  "EH": "Sáhara Occidental",
+  "WS": "Samoa",
+  "AS": "Samoa Americana",
+  "KN": "San Cristóbal y Nieves",
+  "SM": "San Marino",
+  "PM": "San Pedro y Miquelón",
+  "VC": "San Vicente y las Granadinas",
+  "SH": "Santa Helena",
+  "LC": "Santa Lucía",
+  "ST": "Santo Tomé y Príncipe",
+  "SN": "Senegal",
+  "CS": "Serbia y Montenegro",
+  "SC": "Seychelles",
+  "SL": "Sierra Leona",
+  "SG": "Singapur",
+  "SY": "Siria",
+  "SO": "Somalia",
+  "LK": "Sri Lanka",
+  "SZ": "Suazilandia",
+  "ZA": "Sudáfrica",
+  "SD": "Sudán",
+  "SE": "Suecia",
+  "CH": "Suiza",
+  "SR": "Surinam",
+  "SJ": "Svalbard y Jan Mayen",
+  "TH": "Tailandia",
+  "TW": "Taiwán",
+  "TZ": "Tanzania",
+  "TJ": "Tayikistán",
+  "IO": "Territorio Británico del Océano Índico",
+  "TF": "Territorios Australes Franceses",
+  "TL": "Timor Oriental",
+  "TG": "Togo",
+  "TK": "Tokelau",
+  "TO": "Tonga",
+  "TT": "Trinidad y Tobago",
+  "TN": "Túnez",
+  "TM": "Turkmenistán",
+  "TR": "Turquía",
+  "TV": "Tuvalu",
+  "UA": "Ucrania",
+  "UG": "Uganda",
+  "EU": "Unión Europea",
+  "UY": "Uruguay",
+  "UZ": "Uzbekistán",
+  "VU": "Vanuatu",
+  "VE": "Venezuela",
+  "VN": "Vietnam",
+  "WF": "Wallis y Futuna",
+  "YE": "Yemen",
+  "DJ": "Yibuti",
+  "ZM": "Zambia",
+  "ZW": "Zimbabue"
+};
+
+$.each(id_types, function(key, value) {
+  key = key.substring(1);
+  $('#id-type')
+    .append($("<option></option>")
+      .attr("value",key)
+      .text(value));
+});
+$.each(jornadas, function(key, value) {
+  $('#jornada')
+    .append($("<option></option>")
+      .attr("value",key)
+      .text(value));
+});
+$.each(observaciones, function(key, value) {
+  $('#observacion')
+    .append($("<option></option>")
+      .attr("value",key)
+      .text(value));
+});
+$.each(ocupaciones, function(key, value) {
+  key = key.substring(1);
+  $('#ocupacion')
+    .append($("<option></option>")
+      .attr("value",key)
+      .text(value));
+});
+$.each(nacionalidades, function(key, value) {
+  $('#nacionalidad')
+    .append($("<option></option>")
+      .attr("value",key)
+      .text(value));
+});
+</script>
+</body>
